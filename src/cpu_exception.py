@@ -1,0 +1,2 @@
+class OpcodeNotImplementedException(Exception):
+    pass
