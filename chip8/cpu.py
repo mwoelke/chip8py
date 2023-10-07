@@ -276,15 +276,16 @@ class Chip8CPU:
 
     def instr_shr_vx(self):
         """
-        8xy6: Right-shift Vx 
-        Vf = 1 if least-significant bit of Vx is 1 or Vf = 0 otherwise. Then divide Vx by 2.
+        8xy6: Vx = Vy, then right-shift Vx by 1 
+        Set Vf = 1 if least-significant bit of Vx was 1 or Vf = 0 otherwise.
+        WARNING: This opcode is ambiguous! Many Chip-8 implementations ignore Vy.
         """
         x = (self.operand & 0x0F00) >> 8
-        if (self.v[x] & 0x000F) % 2 == 0:
-            self.v[0xF] = 0
-        else:
-            self.v[0xF] = 1
+        y = (self.operand & 0x00F0) >> 4
+        self.v[x] = self.v[y]
+        self.v[0xF] = self.v[x] & 0x1
         self.v[x] >>= 1
+        
 
     # 8xy7: Subtract Vx from Vy and store on Vx. Set Vf = 1 if Vx > Vy or Vf = 0 otherwise
     def instr_subn_vy(self):
@@ -299,14 +300,14 @@ class Chip8CPU:
 
     def instr_shl_vx(self):
         """
-        8xyE: Left-Shift Vx
-        Vf = 1 if least-significant bit of Vx is 1 or Vf = 0 otherwise. Then multiply Vx by 2.
+        8xyE: Vx = Vy, then left-shift Vx by 1 
+        Set Vf = 1 if most-significant bit of Vx was 1 or Vf = 0 otherwise.
+        WARNING: This opcode is ambiguous! Many Chip-8 implementations ignore Vy.
         """
         x = (self.operand & 0x0F00) >> 8
-        if (self.v[x] & 0x000F) % 2 == 0:
-            self.v[0xF] = 0
-        else:
-            self.v[0xF] = 1
+        y = (self.operand & 0x00F0) >> 4
+        self.v[x] = self.v[y]
+        self.v[0xF] = self.v[x] & 0x80
         self.v[x] <<= 1
 
     def instr_sne_vx_vy(self):
