@@ -20,8 +20,9 @@ class Chip8Display(object):
         pygame.display.set_caption('CHIP8')
 
 
-    def flip_pixel(self, x,y) -> bool:
+    def flip_pixel(self, x, y) -> bool:
         """
+        Flip the pixel at coordinate (x,y)
         Returns: 
             0 if pixel was not set before, 1 if pixel was set
         """

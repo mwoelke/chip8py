@@ -256,9 +256,11 @@ class Chip8CPU:
 
         self.v[0xf] = 0
         for row in range(z):
+            if (y_cord + row) >= 32:
+                break
             sprite_row = self.memory[self.I + row] # get sprite
             # split into individual pixels (note: string manipulation might be faster)
-            pixels = (
+            pixels = [
                 (sprite_row & 0x80) >> 7,
                 (sprite_row & 0x40) >> 6,
                 (sprite_row & 0x20) >> 5,
@@ -267,21 +269,14 @@ class Chip8CPU:
                 (sprite_row & 0x4) >> 2,
                 (sprite_row & 0x2) >> 1,
                 (sprite_row & 0x1)
-            )
+            ]
 
-            for pixel in pixels:
+            for (index, pixel) in enumerate(pixels):
                 if pixel == 1:
-                    overwritten = self.display.flip_pixel(x_cord, y_cord)
-                    if overwritten:
+                    if (x_cord + index) >= 64:
+                        break
+                    if (self.display.flip_pixel(x_cord + index, y_cord + row)):
                         self.v[0xf] = 1
-                x_cord += 1
-                if x_cord >= 64:
-                    x_cord = 0
-                    break
-            y_cord += 1
-            if y_cord >= 32:
-                y_cord = 0
-                break
         self.display.update() # update screen
     
     # Ex9E: Skip next instruction if key with value of Vx is pressed
