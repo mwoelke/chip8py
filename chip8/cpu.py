@@ -6,8 +6,9 @@ from math import floor
 MEMORY_SIZE = 4069
 
 class Chip8CPU:
-    def __init__(self, display: Chip8Display):
+    def __init__(self, display: Chip8Display, debug: bool = False):
         self.display = display
+        self.debug = debug
 
         # initialize the 16 general purpose registers (v0 - vF) (8 bit)
         self.v = []
@@ -54,9 +55,10 @@ class Chip8CPU:
             (self.operand & 0x000F),
         )
 
-        # print('-----')
-        # print(f"Executing: {hex(operand_nibbles[0]), hex(operand_nibbles[1]), hex(operand_nibbles[2]), hex(operand_nibbles[3])}")
-        # print(f"PC: {self.pc}")
+        if self.debug:
+            print('-----')
+            print(f"Executing: {hex(operand_nibbles[0]), hex(operand_nibbles[1]), hex(operand_nibbles[2]), hex(operand_nibbles[3])}")
+            print(f"PC: {self.pc}")
 
         # decode and execute
         match operand_nibbles:
@@ -69,14 +71,28 @@ class Chip8CPU:
                 return # Do not increment pc
             case (0x2, _, _, _):        # 2xxx (call subroutine)
                 self.instr_call()
-            case (0x3, _, _, _):        # 6xyy (skip if Vx == yy)
-                self.instr_se_byte()
+            case (0x3, _, _, _):        # 3xyy (skip if Vx == yy)
+                self.instr_se_vx_byte()
+            case (0x4, _, _, _):        # 4xyy (skip if Vx != yy)
+                self.instr_sne_vx_byte()        
             case (0x6, _, _, _):        # 6xyy (Vx == yy)
                 self.instr_ld_byte()
             case (0x7, _, _, _):        # 7xyy (Vx += yy)
                 self.instr_add_byte()
+            case (0x8, _, _, 0x0):      # 8xy0 (Vx = Vy)
+                self.instr_ld_vx_vy()
+            case (0x8, _, _, 0x1):      # 8xy1 (Vx OR Vy)
+                self.instr_or_vx_vy()
+            case (0x8, _, _, 0x2):      # 8xy2 (Vx AND Vy)
+                self.instr_and_vx_vy    
+            case (0x8, _, _, 0x3):      # 8xy3 (Vx XOR Vy)
+                self.instr_xor_vx_vy()
+            case (0x8, _, _, 0x4):      # 8xy4 (Vx += Vy) 
+                self.instr_add_vx_vy()
             case (0xA, _, _, _):        # Axxx (I = xxx)
-                self.instr_ld_i()
+                self.instr_ld_i_byte()
+            case (0xC, _, _, _):        # Cxyy (Vx = random)
+                self.instr_vx_rnd()
             case (0xD, _, _, _):        # Dxyz (draw)
                 self.instr_drw()
             case (0xF, _, 0, 7):        # Fx07 (Vx = delay timer)
@@ -85,6 +101,8 @@ class Chip8CPU:
                 self.instr_ld_dt_vx()
             case (0xF, _, 0x1, 0xE):    # Fx1E (I += Vx)
                 self.instr_add_i_vx()
+            case (0xF, _, 0x6, 0x5):    # Fx65 (Fill V0 to Vx starting at I)
+                self.instr_ld_v0_vx_I()
             case _:  # unknown opcode, raise exception
                 raise OpcodeNotImplementedException((operand_nibbles, self.pc - 0x200))
 
@@ -102,11 +120,11 @@ class Chip8CPU:
         for index, value in enumerate(memory):
             self.memory[index + offset] = value
 
-    def delay_timers(self):
+    def decrement_timers(self):
         """
         Decrease delay and sound timer by one
         """
-        print(f"Delay: {self.timers['delay']} | Sound: {self.timers['sound']}")
+        # print(f"Delay: {self.timers['delay']} | Sound: {self.timers['sound']}")
         if self.timers['delay'] > 0:
             self.timers['delay'] -= 1
         if self.timers['sound'] > 0:
@@ -144,7 +162,7 @@ class Chip8CPU:
         self.stack.append(self.pc)
         self.pc = self.operand & 0x0FFF
 
-    def instr_se_byte(self):
+    def instr_se_vx_byte(self):
         """
         3xyy: Skip next instruction if Vx = yy (increment pc by 2)
         """
@@ -153,7 +171,7 @@ class Chip8CPU:
         if self.v[x] == yy:
             self.pc += 2
 
-    def instr_sne(self):
+    def instr_sne_vx_byte(self):
         """
         4xyy: Skip next instruction if Vx != yy (increment pc by 2)
         """
@@ -181,35 +199,46 @@ class Chip8CPU:
         if self.v[x] > 255:  # handle overflow (8-bit).
             self.v[x] -= 256
 
-    # 8xy0: Vx = Vy
     def instr_ld_vx_vy(self):
+        """
+        8xy0: Vx = Vy
+        """
         x = (self.operand & 0x0F00) >> 8
         y = (self.operand & 0x00F0) >> 4
         self.v[x] = self.v[y]
 
-    # 8xy1: OR Vx and Vy, store result in Vx
-    def instr_or_vy(self):
+    def instr_or_vx_vy(self):
+        """
+        8xy1: Vx OR Vy, store result in Vx
+        """
         x = (self.operand & 0x0F00) >> 8
         y = (self.operand & 0x00F0) >> 4
         self.v[x] = self.v[x] | self.v[y]
 
-    # 8xy2: AND Vx and Vy, store result in Vy
-    def instr_and_vy(self):
+    def instr_and_vx_vy(self):
+        """
+        8xy2: Vx AND Vy, store result in Vx
+        """
         x = (self.operand & 0x0F00) >> 8
         y = (self.operand & 0x00F0) >> 4
         self.v[x] = self.v[x] & self.v[y]
 
-    # 8xy3: XOR Vx and Vy, store result in Vy
-    def instr_xor_vy(self):
+    def instr_xor_vx_vy(self):
+        """
+        8xy3: Vx XOR Vy, store result in Vx
+        """
         x = (self.operand & 0x0F00) >> 8
         y = (self.operand & 0x00F0) >> 4
         self.v[x] = self.v[x] ^ self.v[y]
 
-    # 8xy4: Add Vy to Vx. Set Vf = 1 on overflow or Vf = 0 otherwise
-    def instr_add_xy(self):
+    def instr_add_vx_vy(self):
+        """
+        8xy4: Vx += Vy, set Vf = 1 on overflow or Vf = 0 otherwise
+        """
         x = (self.operand & 0x0F00) >> 8
         y = (self.operand & 0x00F0) >> 4
         self.v[x] += self.v[y]
+
         if self.v[x] > 255:  # handle overflow
             self.v[x] -= 256
             self.v[0xF] = 1
@@ -263,8 +292,10 @@ class Chip8CPU:
         if self.v[x] != self.v[y]:
             self.pc += 2
 
-    # Axxx: Set register I to xxx
-    def instr_ld_i(self):
+    def instr_ld_i_byte(self):
+        """
+        I = xxx
+        """
         self.I = self.operand & 0x0FFF
 
     # Bxxx: Program counter is set to xxx + V0.
@@ -272,8 +303,10 @@ class Chip8CPU:
     def instr_jp_v0(self):
         self.pc = (self.operand & 0x0FFF) + self.v[0]
 
-    # Cxyy: Set Vx to a random byte AND yy
-    def instr_rnd(self):
+    def instr_vx_rnd(self):
+        """
+        Cxyy: Set Vx to a random byte AND yy
+        """
         x = (self.operand & 0x0F00) >> 8
         rand = randint(0, 255)
         self.v[x] = rand & (self.operand & 0x00FF)
@@ -287,8 +320,8 @@ class Chip8CPU:
         y = (self.operand & 0x00F0) >> 4
         z = self.operand & 0x000F
 
-        x_pos = self.v[x]
-        y_pos = self.v[y]
+        x_pos = self.v[x] % 64
+        y_pos = self.v[y] % 32
 
         self.v[0xF] = 0  # reset Vf
         for row in range(z):
@@ -308,8 +341,10 @@ class Chip8CPU:
 
             for index, pixel in enumerate(pixels):
                 if pixel == 1:
-                    x_coord = (x_pos + index) % 64
-                    y_coord = (y_pos + row) % 32
+                    x_coord = (x_pos + index)
+                    y_coord = (y_pos + row)
+                    if x_coord >= 64 or y_coord >= 32:
+                        break
                     if self.display.flip_pixel(x_coord, y_coord):
                         self.v[0xF] = 1
 
@@ -380,8 +415,10 @@ class Chip8CPU:
         for i in range(x + 1):
             self.memory[self.I + i] = self.v[i]
 
-    # Fx65: Fill v0 to Vx from memory starting at address in I
     def instr_ld_v0_vx_I(self):
+        """
+        Fx65: Fill v0 to Vx from memory starting at address in I
+        """
         x = (self.operand & 0x0F00) >> 8
 
         for i in range(x + 1):

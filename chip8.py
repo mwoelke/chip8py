@@ -2,10 +2,15 @@
 from chip8.cpu import Chip8CPU
 from chip8.display import Chip8Display
 import pygame
-import sys
+from argparse import ArgumentParser
+
+parser = ArgumentParser()
+parser.add_argument("-r", "--rom", required=True, help="ROM to load")
+parser.add_argument("-d", "--debug", help="Print debug information", action="store_true")
+args = parser.parse_args()
 
 screen = Chip8Display()
-cpu = Chip8CPU(screen)
+cpu = Chip8CPU(screen, args.debug)
 
 # Timer for delay and sound timer.
 # Chip8 expects timers to decrement at 60Hz which is ~17ms
@@ -13,7 +18,7 @@ TIMER_EVENT = pygame.USEREVENT
 pygame.time.set_timer(TIMER_EVENT, 17)
 
 # load ROM
-with open("roms/IBM_Logo.ch8", "rb") as rom_file:
+with open(args.rom, "rb") as rom_file:
     rom = bytearray(rom_file.read())
     cpu.load_memory(rom, 0x200)
 
@@ -25,5 +30,5 @@ while True:
             pygame.quit()
             exit()
         elif event.type == TIMER_EVENT:
-            cpu.delay_timers()
+            cpu.decrement_timers()
     cpu.execute_instr()
