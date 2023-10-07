@@ -17,6 +17,11 @@ cpu = Chip8CPU(screen, args.debug)
 TIMER_EVENT = pygame.USEREVENT
 pygame.time.set_timer(TIMER_EVENT, 17)
 
+# load font
+with open('font.ch8', "rb") as font_file:
+    rom = bytearray(font_file.read())
+    cpu.load_memory(rom, 0x0)
+
 # load ROM
 with open(args.rom, "rb") as rom_file:
     rom = bytearray(rom_file.read())

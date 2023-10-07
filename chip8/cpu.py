@@ -111,6 +111,8 @@ class Chip8CPU:
                 self.instr_ld_dt_vx()
             case (0xF, _, 0x1, 0xE):    # Fx1E (I += Vx)
                 self.instr_add_i_vx()
+            case (0xF, _, 0x2, 0x9):    # Fx29 (Load sprite for nibble at Vx) 
+                self.instr_ld_i_vx()
             case (0xF, _, 0x3, 0x3):    # Fx33 (Store decimal number at I)
                 self.instr_ld_bcd_vx_i()
             case (0xF, _, 0x5, 0x5):    # Fx55 (Store V0 to Vx starting at I)
@@ -424,9 +426,12 @@ class Chip8CPU:
         x = (self.operand & 0x0F00) >> 8
         self.I += self.v[x]  # @todo: overflow?
 
-    # Fx29: I = Location of sprite for digit Vx
     def instr_ld_i_vx(self):
-        raise OpcodeNotImplementedException()
+        """
+        Fx29: I = Location of sprite for digit Vx
+        """
+        x = (self.operand & 0x0F00) >> 8
+        self.I = self.v[x] * 10
 
     def instr_ld_bcd_vx_i(self):
         """
