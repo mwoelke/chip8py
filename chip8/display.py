@@ -15,6 +15,7 @@ class Chip8Display(object):
         pygame.init()
 
         self.screen = pygame.display.set_mode((self.width * SCALE, self.height * SCALE))
+        self.screen.fill(COLOR_ON)
 
         pygame.display.set_caption("CHIP8")
 

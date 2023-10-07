@@ -75,6 +75,8 @@ class Chip8CPU:
                 self.instr_se_vx_byte()
             case (0x4, _, _, _):        # 4xyy (skip if Vx != yy)
                 self.instr_sne_vx_byte()        
+            case (0x5, _, _, 0):        # 5xy0 (skip if Vx == Vy)
+                self.instr_se_vx_vy()
             case (0x6, _, _, _):        # 6xyy (Vx == yy)
                 self.instr_ld_byte()
             case (0x7, _, _, _):        # 7xyy (Vx += yy)
@@ -89,6 +91,14 @@ class Chip8CPU:
                 self.instr_xor_vx_vy()
             case (0x8, _, _, 0x4):      # 8xy4 (Vx += Vy) 
                 self.instr_add_vx_vy()
+            case (0x8, _, _, 0x5):      # 8xy5 (Vx -= Vy)
+                self.instr_sub_vx_vy()
+            case (0x8, _, _, 0x6):      # 8xy6 (shift-right Vx)
+                self.instr_shr_vx()
+            case (0x8, _, _, 0xE):      # 8xyE (shift-left Vx)
+                self.instr_shl_vx()
+            case (0x9, _, _, 0x0):      # 9xy0 (skip if Vx != Vy)
+                self.instr_sne_vx_vy()
             case (0xA, _, _, _):        # Axxx (I = xxx)
                 self.instr_ld_i_byte()
             case (0xC, _, _, _):        # Cxyy (Vx = random)
@@ -101,8 +111,12 @@ class Chip8CPU:
                 self.instr_ld_dt_vx()
             case (0xF, _, 0x1, 0xE):    # Fx1E (I += Vx)
                 self.instr_add_i_vx()
-            case (0xF, _, 0x6, 0x5):    # Fx65 (Fill V0 to Vx starting at I)
-                self.instr_ld_v0_vx_I()
+            case (0xF, _, 0x3, 0x3):    # Fx33 (Store decimal number at I)
+                self.instr_ld_bcd_vx_i()
+            case (0xF, _, 0x5, 0x5):    # Fx55 (Store V0 to Vx starting at I)
+                self.instr_store_v0_vx()
+            case (0xF, _, 0x6, 0x5):    # Fx65 (Read V0 to Vx starting at I)
+                self.instr_read_v0_vx()
             case _:  # unknown opcode, raise exception
                 raise OpcodeNotImplementedException((operand_nibbles, self.pc - 0x200))
 
@@ -180,8 +194,10 @@ class Chip8CPU:
         if self.v[x] != yy:
             self.pc += 2
 
-    # 5xy0: Skip next instruction if Vx = Vy (increment pc by 2)
-    def instr_se_vy(self):
+    def instr_se_vx_vy(self):
+        """
+        5xy0: Skip next instruction if Vx = Vy (increment pc by 2)
+        """
         x = (self.operand & 0x0F00) >> 8
         y = (self.operand & 0x00F0) >> 4
         if self.v[x] == self.v[y]:
@@ -245,8 +261,10 @@ class Chip8CPU:
         else:
             self.v[0xF] = 0
 
-    # 8xy5: Subtract Vy from Vx and store in Vx. Set Vf = 1 if Vx > Vy or Vf = 0 otherwise
-    def instr_sub_vy(self):
+    def instr_sub_vx_vy(self):
+        """
+        8xy5: Vx -= Vy, set Vf = 1 if Vx > Vy or Vf = 0 otherwise
+        """
         x = (self.operand & 0x0F00) >> 8
         y = (self.operand & 0x00F0) >> 4
         self.v[x] -= self.v[y]
@@ -256,8 +274,11 @@ class Chip8CPU:
         else:
             self.v[0xF] = 1
 
-    # 8xy6: Set Vf = 1 if least-significant bit of Vx is 1 or Vf = 0 otherwise. Then divide Vx by 2.
-    def instr_shr(self):
+    def instr_shr_vx(self):
+        """
+        8xy6: Right-shift Vx 
+        Vf = 1 if least-significant bit of Vx is 1 or Vf = 0 otherwise. Then divide Vx by 2.
+        """
         x = (self.operand & 0x0F00) >> 8
         if (self.v[x] & 0x000F) % 2 == 0:
             self.v[0xF] = 0
@@ -276,8 +297,11 @@ class Chip8CPU:
         else:
             self.v[0xF] = 1
 
-    # 8xyE: Set Vf = 1 if least-significant bit of Vx is 1 or Vf = 0 otherwise. Then multiply Vx by 2.
-    def instr_shr(self):
+    def instr_shl_vx(self):
+        """
+        8xyE: Left-Shift Vx
+        Vf = 1 if least-significant bit of Vx is 1 or Vf = 0 otherwise. Then multiply Vx by 2.
+        """
         x = (self.operand & 0x0F00) >> 8
         if (self.v[x] & 0x000F) % 2 == 0:
             self.v[0xF] = 0
@@ -285,8 +309,10 @@ class Chip8CPU:
             self.v[0xF] = 1
         self.v[x] <<= 1
 
-    # 9xy0: Skip next instruction if Vx != Vy (increment pc by 2)
-    def instr_sne_vy(self):
+    def instr_sne_vx_vy(self):
+        """
+        9xy0: Skip next instruction if Vx != Vy (increment pc by 2)
+        """
         x = (self.operand & 0x0F00) >> 8
         y = (self.operand & 0x00F0) >> 4
         if self.v[x] != self.v[y]:
@@ -323,6 +349,9 @@ class Chip8CPU:
         x_pos = self.v[x] % 64
         y_pos = self.v[y] % 32
 
+        if self.debug: 
+            print(f"Printing sprite at ({(x_pos, y_pos)})")
+
         self.v[0xF] = 0  # reset Vf
         for row in range(z):
             sprite_row = self.memory[self.I + row]  # get byte to display at current row
@@ -338,6 +367,9 @@ class Chip8CPU:
                 (sprite_row & 0x2) >> 1,
                 (sprite_row & 0x1),
             ]
+
+            if self.debug:
+                print(f"Trying to print sprite from ({hex(self.I + row)}): {pixels}")
 
             for index, pixel in enumerate(pixels):
                 if pixel == 1:
@@ -395,8 +427,10 @@ class Chip8CPU:
     def instr_ld_i_vx(self):
         raise OpcodeNotImplementedException()
 
-    # Fx33: Take decimal number in format 'abc' from Vx and store a at I, b at I+1 and c at I+2
     def instr_ld_bcd_vx_i(self):
+        """
+        Fx33: Take decimal number in format 'abc' from Vx and store a at I, b at I+1 and c at I+2
+        """
         x = (self.operand & 0x0F00) >> 8
 
         a = floor(self.v[x] / 100)
@@ -408,16 +442,18 @@ class Chip8CPU:
         self.memory[self.I + 1] = int(b)
         self.memory[self.I + 2] = int(c)
 
-    # Fx55: Put v0 to Vx in memory starting at address in I
-    def instr_ld_v0_vx_I(self):
+    def instr_store_v0_vx(self):
+        """
+        Fx55: Store v0 to Vx in memory starting at address in I
+        """
         x = (self.operand & 0x0F00) >> 8
 
         for i in range(x + 1):
             self.memory[self.I + i] = self.v[i]
 
-    def instr_ld_v0_vx_I(self):
+    def instr_read_v0_vx(self):
         """
-        Fx65: Fill v0 to Vx from memory starting at address in I
+        Fx65: Read v0 to Vx from memory starting at address in I
         """
         x = (self.operand & 0x0F00) >> 8
 
