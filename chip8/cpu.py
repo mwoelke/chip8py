@@ -65,17 +65,27 @@ class Chip8CPU:
                 self.instr_cls()
             case (0x0, 0x0, 0xE, 0xE):  # 00EE (return from subroutine)
                 self.instr_ret()
-            case (0x1, _, _, _):  # 1xxx (jump, pc = xxx)
+            case (0x1, _, _, _):        # 1xxx (jump)
                 self.instr_jmp()
                 return # Do not increment pc
-            case (0x6, _, _, _):  # 6xyy (Vx == yy)
+            case (0x2, _, _, _):        # 2xxx (call subroutine)
+                self.instr_call()
+            case (0x3, _, _, _):        # 6xyy (skip if Vx == yy)
+                self.instr_se_byte()
+            case (0x6, _, _, _):        # 6xyy (Vx == yy)
                 self.instr_ld_byte()
-            case (0x7, _, _, _):  # 7xyy (Vx += yy)
+            case (0x7, _, _, _):        # 7xyy (Vx += yy)
                 self.instr_add_byte()
-            case (0xA, _, _, _):  # Axxx (I = xxx)
+            case (0xA, _, _, _):        # Axxx (I = xxx)
                 self.instr_ld_i()
-            case (0xD, _, _, _):  # Dxyz (draw)
+            case (0xD, _, _, _):        # Dxyz (draw)
                 self.instr_drw()
+            case (0xF, _, 0, 7):        # Fx07 (Vx = delay timer)
+                self.instr_ld_vx_dt()
+            case (0xF, _, 0x1, 0x5):    # Fx15 (delay timer = Vx)
+                self.instr_ld_dt_vx()
+            case (0xF, _, 0x1, 0xE):    # Fx1E (I += Vx)
+                self.instr_add_i_vx()
             case _:  # unknown opcode, raise exception
                 raise OpcodeNotImplementedException((operand_nibbles, self.pc - 0x200))
 
@@ -108,25 +118,33 @@ class Chip8CPU:
         self.pc = self.stack.pop()
         # self.sp -= 1
 
-    # 1xxx: Set program counter to xxx
     def instr_jmp(self):
+        """
+        1xxx: Set program counter to xxx
+        """
         self.pc = self.operand & 0x0FFF
 
-    # 2xxx: Call subroutine. Puts current pc on top of stack and set pc to 2xxx
     def instr_call(self):
-        # self.sp += 1
+        """
+        2xxx: Call subroutine. 
+        Put current PC on top of stack and set PC to xxx
+        """
         self.stack.append(self.pc)
         self.pc = self.operand & 0x0FFF
 
-    # 3xyy: Skip next instruction if Vx = yy (increment pc by 2)
     def instr_se_byte(self):
+        """
+        3xyy: Skip next instruction if Vx = yy (increment pc by 2)
+        """
         x = (self.operand & 0x0F00) >> 8
         yy = self.operand & 0x00FF
         if self.v[x] == yy:
             self.pc += 2
 
-    # 4xyy: Skip next instruction if Vx != yy (increment pc by 2)
     def instr_sne(self):
+        """
+        4xyy: Skip next instruction if Vx != yy (increment pc by 2)
+        """
         x = (self.operand & 0x0F00) >> 8
         yy = self.operand & 0x00FF
         if self.v[x] != yy:
@@ -248,8 +266,11 @@ class Chip8CPU:
         rand = randint(0, 255)
         self.v[x] = rand & (self.operand & 0x00FF)
 
-    # Dxyz: Display z-byte sprite starting from I at (Vx, Vy). Set Vf if a already drawn pixel gets overwritten (XOR).
     def instr_drw(self):
+        """
+        Dxyz: Display z-byte sprite starting from I at (Vx, Vy). 
+        Set Vf = 1 if a already drawn pixel gets overwritten (XOR).
+        """
         x = (self.operand & 0x0F00) >> 8
         y = (self.operand & 0x00F0) >> 4
         z = self.operand & 0x000F
@@ -290,8 +311,10 @@ class Chip8CPU:
     def instr_sknp(self):
         raise OpcodeNotImplementedException("skip next if key vx is not pressed")
 
-    # Fx07: Vx = delay timer
     def instr_ld_vx_dt(self):
+        """
+        Fx07: Vx = delay timer
+        """
         x = (self.operand & 0x0F00) >> 8
         self.v[x] = self.timers["delay"]
 
@@ -302,8 +325,10 @@ class Chip8CPU:
         k = 0xA  # @todo: get key here
         self.v[x] = k
 
-    # Fx15: Delay timer = Vx
     def instr_ld_dt_vx(self):
+        """
+        Fx15: Delay timer = Vx
+        """
         x = (self.operand & 0x0F00) >> 8
         self.timers["delay"] = self.v[x]
 
@@ -312,8 +337,10 @@ class Chip8CPU:
         x = (self.operand & 0x0F00) >> 8
         self.timers["delay"] = self.v[x]
 
-    # Fx1E: I = I + Vx
     def instr_add_i_vx(self):
+        """
+        Fx1E: I = I + Vx
+        """
         x = (self.operand & 0x0F00) >> 8
         self.I += self.v[x]  # @todo: overflow?
 
