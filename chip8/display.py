@@ -1,8 +1,8 @@
 import pygame
 import sys
 
-COLOR_OFF = (0, 0, 0)
-COLOR_ON = (255, 255, 255)
+COLOR_OFF = (0xff, 0xf6, 0xd3)
+COLOR_ON  = (0x7c, 0x3f, 0x58)
 SCALE = 10
 
 
