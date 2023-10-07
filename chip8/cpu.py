@@ -5,7 +5,6 @@ from math import floor
 
 MEMORY_SIZE = 4069
 
-
 class Chip8CPU:
     def __init__(self, display: Chip8Display):
         self.display = display
@@ -91,14 +90,27 @@ class Chip8CPU:
 
         self.pc += 2  # increment program counter by two bytes
 
-    # load bytearray into memory and add padding if required
     def load_memory(self, memory: bytearray, offset: int):
+        """
+        Load bytearray into memory at given offset.
+        ROMs should go at 0x200.
+        """
         if (
             len(memory) + offset
         ) > MEMORY_SIZE:  # throw exception when loading too much into memory
             raise Exception(f"Memory limit of {MEMORY_SIZE} exceeded")
         for index, value in enumerate(memory):
             self.memory[index + offset] = value
+
+    def delay_timers(self):
+        """
+        Decrease delay and sound timer by one
+        """
+        print(f"Delay: {self.timers['delay']} | Sound: {self.timers['sound']}")
+        if self.timers['delay'] > 0:
+            self.timers['delay'] -= 1
+        if self.timers['sound'] > 0:
+            self.timers['sound'] -= 1
 
     ###################
     ### CPU opcodes ###
