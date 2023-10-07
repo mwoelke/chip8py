@@ -86,7 +86,7 @@ class Chip8CPU:
             case (0x8, _, _, 0x1):      # 8xy1 (Vx OR Vy)
                 self.instr_or_vx_vy()
             case (0x8, _, _, 0x2):      # 8xy2 (Vx AND Vy)
-                self.instr_and_vx_vy    
+                self.instr_and_vx_vy()
             case (0x8, _, _, 0x3):      # 8xy3 (Vx XOR Vy)
                 self.instr_xor_vx_vy()
             case (0x8, _, _, 0x4):      # 8xy4 (Vx += Vy) 
@@ -229,7 +229,7 @@ class Chip8CPU:
         """
         x = (self.operand & 0x0F00) >> 8
         y = (self.operand & 0x00F0) >> 4
-        self.v[x] = self.v[x] | self.v[y]
+        self.v[x] |= self.v[y]
 
     def instr_and_vx_vy(self):
         """
@@ -237,7 +237,7 @@ class Chip8CPU:
         """
         x = (self.operand & 0x0F00) >> 8
         y = (self.operand & 0x00F0) >> 4
-        self.v[x] = self.v[x] & self.v[y]
+        self.v[x] &= self.v[y]
 
     def instr_xor_vx_vy(self):
         """
