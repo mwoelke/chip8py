@@ -1,7 +1,7 @@
-from cpu_exception import OpcodeNotImplementedException
+from chip8.cpu_exception import OpcodeNotImplementedException
+from chip8.display import Chip8Display
 from random import randint
 from math import floor
-from display import Chip8Display
 
 MEMORY_SIZE = 4069
 
@@ -59,8 +59,6 @@ class Chip8CPU:
         # print(f"Executing: {hex(operand_nibbles[0]), hex(operand_nibbles[1]), hex(operand_nibbles[2]), hex(operand_nibbles[3])}")
         # print(f"PC: {self.pc}")
 
-        advance = True
-
         # decode and execute
         match operand_nibbles:
             case (0x0, 0x0, 0xE, 0x0):  # 00E0 (clear screen)
@@ -69,7 +67,7 @@ class Chip8CPU:
                 self.instr_ret()
             case (0x1, _, _, _):  # 1xxx (jump, pc = xxx)
                 self.instr_jmp()
-                advance = False
+                return # Do not increment pc
             case (0x6, _, _, _):  # 6xyy (Vx == yy)
                 self.instr_ld_byte()
             case (0x7, _, _, _):  # 7xyy (Vx += yy)
@@ -81,8 +79,7 @@ class Chip8CPU:
             case _:  # unknown opcode, raise exception
                 raise OpcodeNotImplementedException((operand_nibbles, self.pc - 0x200))
 
-        if advance:
-            self.pc += 2  # increment program counter by two bytes
+        self.pc += 2  # increment program counter by two bytes
 
     # load bytearray into memory and add padding if required
     def load_memory(self, memory: bytearray, offset: int):
@@ -97,12 +94,17 @@ class Chip8CPU:
     ### CPU opcodes ###
     ###################
 
-    # 00E0: Clear display
     def instr_cls(self):
+        """
+        00E0: Clear display
+        """
         self.display.clear()
 
     # 00EE: Return from subroutine
     def instr_ret(self):
+        """
+        00EE: Return from subroutine
+        """
         self.pc = self.stack.pop()
         # self.sp -= 1
 
@@ -145,7 +147,7 @@ class Chip8CPU:
     # 7xyy: Vx += yy
     def instr_add_byte(self):
         x = (self.operand & 0x0F00) >> 8
-        self.v[x] += (self.operand & 0x00FF) >> 8
+        self.v[x] += (self.operand & 0x00FF) 
         if self.v[x] > 255:  # handle overflow (8-bit).
             self.v[x] -= 256
 
@@ -252,14 +254,13 @@ class Chip8CPU:
         y = (self.operand & 0x00F0) >> 4
         z = self.operand & 0x000F
 
-        x_cord = self.v[x] % 64  # mod screen_width
-        y_cord = self.v[y] % 32  # mod screen_height
+        x_pos = self.v[x]
+        y_pos = self.v[y]
 
         self.v[0xF] = 0  # reset Vf
         for row in range(z):
-            if (y_cord + row) >= 32:
-                break
-            sprite_row = self.memory[self.I + row]  # get sprite
+            sprite_row = self.memory[self.I + row]  # get byte to display at current row
+
             # split into individual pixels (note: string manipulation might be faster)
             pixels = [
                 (sprite_row & 0x80) >> 7,
@@ -274,10 +275,11 @@ class Chip8CPU:
 
             for index, pixel in enumerate(pixels):
                 if pixel == 1:
-                    if (x_cord + index) >= 64:
-                        break
-                    if self.display.flip_pixel(x_cord + index, y_cord + row):
+                    x_coord = (x_pos + index) % 64
+                    y_coord = (y_pos + row) % 32
+                    if self.display.flip_pixel(x_coord, y_coord):
                         self.v[0xF] = 1
+
         self.display.update()  # update screen
 
     # Ex9E: Skip next instruction if key with value of Vx is pressed
