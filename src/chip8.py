@@ -7,7 +7,7 @@ import sys
 screen = Chip8Display()
 cpu = Chip8CPU(screen)
 
-with open('../roms/IBM_Logo.ch8', 'rb') as rom_file:
+with open("../roms/IBM_Logo.ch8", "rb") as rom_file:
     rom = bytearray(rom_file.read())
     cpu.load_memory(rom, 0x200)
 
