@@ -2,8 +2,31 @@ from chip8.cpu_exception import OpcodeNotImplementedException
 from chip8.display import Chip8Display
 from random import randint
 from math import floor
+from pygame import key
+import pygame
 
 MEMORY_SIZE = 4069
+TIMER_EVENT = pygame.USEREVENT
+KEY_MAPPINGS = {
+    0x1: pygame.K_1,
+    0x2: pygame.K_2,
+    0x3: pygame.K_3,
+    0xC: pygame.K_4,
+    0x4: pygame.K_q,
+    0x5: pygame.K_w,
+    0x6: pygame.K_e,
+    0xD: pygame.K_r,
+    0x7: pygame.K_a,
+    0x8: pygame.K_s,
+    0x9: pygame.K_d,
+    0xE: pygame.K_f,
+    0xA: pygame.K_y,
+    0x0: pygame.K_x,
+    0xB: pygame.K_c,
+    0xF: pygame.K_v,
+}
+
+KEY_MAPPINGS_INVERSE = {v: k for k, v in KEY_MAPPINGS.items()}
 
 class Chip8CPU:
     def __init__(self, display: Chip8Display, debug: bool = False):
@@ -38,14 +61,15 @@ class Chip8CPU:
         # initialize RAM
         self.memory = bytearray(MEMORY_SIZE)
 
-    # execute next instruction
-    def execute_instr(self):
-        self.operand = (
-            self.memory[self.pc] << 8
-        )  # get first byte of next instruction from memory
-        self.operand += self.memory[
-            self.pc + 1
-        ]  # get second byte of next instruction from memory
+    def execute_instr(self, event: list):
+        """
+        Execute next instruction and handle keyboard events
+        """
+        # get first byte of next instruction from memory
+        self.operand = self.memory[self.pc] << 8
+
+        # get second byte of next instruction from memory
+        self.operand += self.memory[self.pc + 1]
 
         # split operand into nibbles
         operand_nibbles = (
@@ -56,8 +80,10 @@ class Chip8CPU:
         )
 
         if self.debug:
-            print('-----')
-            print(f"Executing: {hex(operand_nibbles[0]), hex(operand_nibbles[1]), hex(operand_nibbles[2]), hex(operand_nibbles[3])}")
+            print("-----")
+            print(
+                f"Executing: {hex(operand_nibbles[0]), hex(operand_nibbles[1]), hex(operand_nibbles[2]), hex(operand_nibbles[3])}"
+            )
             print(f"PC: {self.pc}")
 
         # decode and execute
@@ -66,58 +92,64 @@ class Chip8CPU:
                 self.instr_cls()
             case (0x0, 0x0, 0xE, 0xE):  # 00EE (return from subroutine)
                 self.instr_ret()
-            case (0x1, _, _, _):        # 1xxx (jump)
+            case (0x1, _, _, _):  # 1xxx (jump)
                 self.instr_jmp()
-                return # Do not increment pc
-            case (0x2, _, _, _):        # 2xxx (call subroutine)
+                return  # Do not increment pc
+            case (0x2, _, _, _):  # 2xxx (call subroutine)
                 self.instr_call()
-            case (0x3, _, _, _):        # 3xyy (skip if Vx == yy)
+            case (0x3, _, _, _):  # 3xyy (skip if Vx == yy)
                 self.instr_se_vx_byte()
-            case (0x4, _, _, _):        # 4xyy (skip if Vx != yy)
-                self.instr_sne_vx_byte()        
-            case (0x5, _, _, 0):        # 5xy0 (skip if Vx == Vy)
+            case (0x4, _, _, _):  # 4xyy (skip if Vx != yy)
+                self.instr_sne_vx_byte()
+            case (0x5, _, _, 0):  # 5xy0 (skip if Vx == Vy)
                 self.instr_se_vx_vy()
-            case (0x6, _, _, _):        # 6xyy (Vx == yy)
+            case (0x6, _, _, _):  # 6xyy (Vx == yy)
                 self.instr_ld_byte()
-            case (0x7, _, _, _):        # 7xyy (Vx += yy)
+            case (0x7, _, _, _):  # 7xyy (Vx += yy)
                 self.instr_add_byte()
-            case (0x8, _, _, 0x0):      # 8xy0 (Vx = Vy)
+            case (0x8, _, _, 0x0):  # 8xy0 (Vx = Vy)
                 self.instr_ld_vx_vy()
-            case (0x8, _, _, 0x1):      # 8xy1 (Vx OR Vy)
+            case (0x8, _, _, 0x1):  # 8xy1 (Vx OR Vy)
                 self.instr_or_vx_vy()
-            case (0x8, _, _, 0x2):      # 8xy2 (Vx AND Vy)
+            case (0x8, _, _, 0x2):  # 8xy2 (Vx AND Vy)
                 self.instr_and_vx_vy()
-            case (0x8, _, _, 0x3):      # 8xy3 (Vx XOR Vy)
+            case (0x8, _, _, 0x3):  # 8xy3 (Vx XOR Vy)
                 self.instr_xor_vx_vy()
-            case (0x8, _, _, 0x4):      # 8xy4 (Vx += Vy) 
+            case (0x8, _, _, 0x4):  # 8xy4 (Vx += Vy)
                 self.instr_add_vx_vy()
-            case (0x8, _, _, 0x5):      # 8xy5 (Vx -= Vy)
+            case (0x8, _, _, 0x5):  # 8xy5 (Vx -= Vy)
                 self.instr_sub_vx_vy()
-            case (0x8, _, _, 0x6):      # 8xy6 (shift-right Vx)
+            case (0x8, _, _, 0x6):  # 8xy6 (shift-right Vx)
                 self.instr_shr_vx()
-            case (0x8, _, _, 0xE):      # 8xyE (shift-left Vx)
+            case (0x8, _, _, 0xE):  # 8xyE (shift-left Vx)
                 self.instr_shl_vx()
-            case (0x9, _, _, 0x0):      # 9xy0 (skip if Vx != Vy)
+            case (0x9, _, _, 0x0):  # 9xy0 (skip if Vx != Vy)
                 self.instr_sne_vx_vy()
-            case (0xA, _, _, _):        # Axxx (I = xxx)
+            case (0xA, _, _, _):  # Axxx (I = xxx)
                 self.instr_ld_i_byte()
-            case (0xC, _, _, _):        # Cxyy (Vx = random)
+            case (0xC, _, _, _):  # Cxyy (Vx = random)
                 self.instr_vx_rnd()
-            case (0xD, _, _, _):        # Dxyz (draw)
+            case (0xD, _, _, _):  # Dxyz (draw)
                 self.instr_drw()
-            case (0xF, _, 0, 7):        # Fx07 (Vx = delay timer)
+            case (0xE, _, 0x9, 0xE):  # Ex9E (skip if key with value Vx is pressed)
+                self.instr_skp()
+            case (0xE, _, 0xA, 0x1):  # ExA1 (skip if key with value vx is not pressed)
+                self.instr_sknp()
+            case (0xF, _, 0x0, 0x7):  # Fx07 (Vx = delay timer)
                 self.instr_ld_vx_dt()
-            case (0xF, _, 0x1, 0x5):    # Fx15 (delay timer = Vx)
+            case (0xF, _, 0x0, 0xA):  # Fx0A (Wait for keypress, then store in Vx)
+                self.instr_ld_vx_k()
+            case (0xF, _, 0x1, 0x5):  # Fx15 (delay timer = Vx)
                 self.instr_ld_dt_vx()
-            case (0xF, _, 0x1, 0xE):    # Fx1E (I += Vx)
+            case (0xF, _, 0x1, 0xE):  # Fx1E (I += Vx)
                 self.instr_add_i_vx()
-            case (0xF, _, 0x2, 0x9):    # Fx29 (Load sprite for nibble at Vx) 
+            case (0xF, _, 0x2, 0x9):  # Fx29 (Load sprite for nibble at Vx)
                 self.instr_ld_i_vx()
-            case (0xF, _, 0x3, 0x3):    # Fx33 (Store decimal number at I)
+            case (0xF, _, 0x3, 0x3):  # Fx33 (Store decimal number at I)
                 self.instr_ld_bcd_vx_i()
-            case (0xF, _, 0x5, 0x5):    # Fx55 (Store V0 to Vx starting at I)
+            case (0xF, _, 0x5, 0x5):  # Fx55 (Store V0 to Vx starting at I)
                 self.instr_store_v0_vx()
-            case (0xF, _, 0x6, 0x5):    # Fx65 (Read V0 to Vx starting at I)
+            case (0xF, _, 0x6, 0x5):  # Fx65 (Read V0 to Vx starting at I)
                 self.instr_read_v0_vx()
             case _:  # unknown opcode, raise exception
                 raise OpcodeNotImplementedException((operand_nibbles, self.pc - 0x200))
@@ -129,10 +161,10 @@ class Chip8CPU:
         Load bytearray into memory at given offset.
         ROMs should go at 0x200.
         """
-        if (
-            len(memory) + offset
-        ) > MEMORY_SIZE:  # throw exception when loading too much into memory
+        # throw exception when loading too much into memory
+        if (len(memory) + offset) > MEMORY_SIZE:
             raise Exception(f"Memory limit of {MEMORY_SIZE} exceeded")
+
         for index, value in enumerate(memory):
             self.memory[index + offset] = value
 
@@ -141,10 +173,10 @@ class Chip8CPU:
         Decrease delay and sound timer by one
         """
         # print(f"Delay: {self.timers['delay']} | Sound: {self.timers['sound']}")
-        if self.timers['delay'] > 0:
-            self.timers['delay'] -= 1
-        if self.timers['sound'] > 0:
-            self.timers['sound'] -= 1
+        if self.timers["delay"] > 0:
+            self.timers["delay"] -= 1
+        if self.timers["sound"] > 0:
+            self.timers["sound"] -= 1
 
     ###################
     ### CPU opcodes ###
@@ -172,7 +204,7 @@ class Chip8CPU:
 
     def instr_call(self):
         """
-        2xxx: Call subroutine. 
+        2xxx: Call subroutine.
         Put current PC on top of stack and set PC to xxx
         """
         self.stack.append(self.pc)
@@ -213,8 +245,10 @@ class Chip8CPU:
     # 7xyy: Vx += yy
     def instr_add_byte(self):
         x = (self.operand & 0x0F00) >> 8
-        self.v[x] += (self.operand & 0x00FF) 
-        if self.v[x] > 255:  # handle overflow (8-bit).
+        self.v[x] += self.operand & 0x00FF
+
+        # handle overflow (8-bit).
+        if self.v[x] > 255:
             self.v[x] -= 256
 
     def instr_ld_vx_vy(self):
@@ -257,7 +291,8 @@ class Chip8CPU:
         y = (self.operand & 0x00F0) >> 4
         self.v[x] += self.v[y]
 
-        if self.v[x] > 255:  # handle overflow
+        # handle overflow
+        if self.v[x] > 255:
             self.v[x] -= 256
             self.v[0xF] = 1
         else:
@@ -278,7 +313,7 @@ class Chip8CPU:
 
     def instr_shr_vx(self):
         """
-        8xy6: Vx = Vy, then right-shift Vx by 1 
+        8xy6: Vx = Vy, then right-shift Vx by 1
         Set Vf = 1 if least-significant bit of Vx was 1 or Vf = 0 otherwise.
         WARNING: This opcode is ambiguous! Many Chip-8 implementations ignore Vy.
         """
@@ -287,13 +322,16 @@ class Chip8CPU:
         self.v[x] = self.v[y]
         self.v[0xF] = self.v[x] & 0x1
         self.v[x] >>= 1
-        
 
-    # 8xy7: Subtract Vx from Vy and store on Vx. Set Vf = 1 if Vx > Vy or Vf = 0 otherwise
     def instr_subn_vy(self):
+        """
+        8xy7: Subtract Vx from Vy and store in Vx.
+        Set Vf = 1 if Vx > Vy or Vf = 0 otherwise.
+        """
         x = (self.operand & 0x0F00) >> 8
         y = (self.operand & 0x00F0) >> 4
         self.v[x] = self.v[y] - self.v[x]
+
         if self.v[x] < 0:
             self.v[x] += 256
             self.v[0xF] = 0
@@ -302,14 +340,14 @@ class Chip8CPU:
 
     def instr_shl_vx(self):
         """
-        8xyE: Vx = Vy, then left-shift Vx by 1 
+        8xyE: Vx = Vy, then left-shift Vx by 1
         Set Vf = 1 if most-significant bit of Vx was 1 or Vf = 0 otherwise.
         WARNING: This opcode is ambiguous! Many Chip-8 implementations ignore Vy.
         """
         x = (self.operand & 0x0F00) >> 8
         y = (self.operand & 0x00F0) >> 4
         self.v[x] = self.v[y]
-        self.v[0xF] = self.v[x] & 0x80
+        self.v[0xF] = (self.v[x] & 0x80) == 0x80
         self.v[x] <<= 1
 
     def instr_sne_vx_vy(self):
@@ -342,7 +380,7 @@ class Chip8CPU:
 
     def instr_drw(self):
         """
-        Dxyz: Display z-byte sprite starting from I at (Vx, Vy). 
+        Dxyz: Display z-byte sprite starting from I at (Vx, Vy).
         Set Vf = 1 if a already drawn pixel gets overwritten (XOR).
         """
         x = (self.operand & 0x0F00) >> 8
@@ -352,12 +390,13 @@ class Chip8CPU:
         x_pos = self.v[x] % 64
         y_pos = self.v[y] % 32
 
-        if self.debug: 
+        if self.debug:
             print(f"Printing sprite at ({(x_pos, y_pos)})")
 
         self.v[0xF] = 0  # reset Vf
         for row in range(z):
-            sprite_row = self.memory[self.I + row]  # get byte to display at current row
+            # get byte to display at current row
+            sprite_row = self.memory[self.I + row]
 
             # split into individual pixels (note: string manipulation might be faster)
             pixels = [
@@ -376,8 +415,8 @@ class Chip8CPU:
 
             for index, pixel in enumerate(pixels):
                 if pixel == 1:
-                    x_coord = (x_pos + index)
-                    y_coord = (y_pos + row)
+                    x_coord = x_pos + index
+                    y_coord = y_pos + row
                     if x_coord >= 64 or y_coord >= 32:
                         break
                     if self.display.flip_pixel(x_coord, y_coord):
@@ -385,13 +424,21 @@ class Chip8CPU:
 
         self.display.update()  # update screen
 
-    # Ex9E: Skip next instruction if key with value of Vx is pressed
-    def instr_skp(self):
-        raise OpcodeNotImplementedException("skip next if key vx is pressed")
+    def instr_skp(self, event):
+        """
+        Ex9E: Skip next instruction if key with value of Vx is pressed
+        """
+        x = (self.operand & 0x0F00) >> 8
+        if key.get_pressed([KEY_MAPPINGS[self.v[x]]]):
+            self.pc += 2
 
-    # ExA1: Skip next instruction if key with value of Vx is not pressed
     def instr_sknp(self):
-        raise OpcodeNotImplementedException("skip next if key vx is not pressed")
+        """
+        ExA1: Skip next instruction if key with value of Vx is not pressed
+        """
+        x = (self.operand & 0x0F00) >> 8
+        if not key.get_pressed([KEY_MAPPINGS[self.v[x]]]):
+            self.pc += 2
 
     def instr_ld_vx_dt(self):
         """
@@ -400,12 +447,36 @@ class Chip8CPU:
         x = (self.operand & 0x0F00) >> 8
         self.v[x] = self.timers["delay"]
 
-    # Fx0A: Stop execution until key is pressed, then store value of key in Vx
     def instr_ld_vx_k(self):
-        raise OpcodeNotImplementedException()
+        """
+        Fx0A: Stop execution until any key is pressed, then store value of key in Vx.
+        If several keys are pressed this will respect the first key from the KEY_MAPPINGS constant.
+        Note: Timers should continue to descent.
+        @todo
+        """
         x = (self.operand & 0x0F00) >> 8
-        k = 0xA  # @todo: get key here
-        self.v[x] = k
+
+        pressed = False
+        while not pressed:
+            for event in pygame.event.get():
+                if event.type == pygame.KEYDOWN:
+                    pressed_keys = key.get_pressed()
+                    # loop over every mapped key and set first pressed key
+                    # @todo how to get char values?
+                    for key_value, key_mapping in enumerate(KEY_MAPPINGS):
+                        if pressed_keys[key_mapping]:
+                            self.v[x] = key_value
+                            pressed = True
+                            break
+                        else:
+                            print(key_mapping)
+
+                elif event.type == TIMER_EVENT:
+                    self.decrement_timers()
+
+                elif event.type == pygame.QUIT:
+                    pygame.quit()
+                    exit()
 
     def instr_ld_dt_vx(self):
         """

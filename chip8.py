@@ -36,4 +36,4 @@ while True:
             exit()
         elif event.type == TIMER_EVENT:
             cpu.decrement_timers()
-    cpu.execute_instr()
+    cpu.execute_instr(event)
