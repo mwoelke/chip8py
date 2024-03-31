@@ -97,6 +97,7 @@ class Chip8CPU:
                 return  # Do not increment pc
             case (0x2, _, _, _):  # 2xxx (call subroutine)
                 self.instr_call()
+                return  # Do not increment pc
             case (0x3, _, _, _):  # 3xyy (skip if Vx == yy)
                 self.instr_se_vx_byte()
             case (0x4, _, _, _):  # 4xyy (skip if Vx != yy)
@@ -195,8 +196,13 @@ class Chip8CPU:
         """
         00EE: Return from subroutine
         """
+        if self.debug:
+            print("Stack before pop:")
+            print(self.stack)
         self.pc = self.stack.pop()
-        # self.sp -= 1
+        if self.debug:
+            print("Stack after pop:")
+            print(self.stack)
 
     def instr_jmp(self):
         """
