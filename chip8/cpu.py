@@ -148,6 +148,8 @@ class Chip8CPU:
                 self.instr_ld_vx_k()
             case (0xF, _, 0x1, 0x5):  # Fx15 (delay timer = Vx)
                 self.instr_ld_dt_vx()
+            case (0xF, _, 0x1, 0x8):  # Fx19 (sound timer = Vx, not implemented)
+                pass
             case (0xF, _, 0x1, 0xE):  # Fx1E (I += Vx)
                 self.instr_add_i_vx()
             case (0xF, _, 0x2, 0x9):  # Fx29 (Load sprite for nibble at Vx)
