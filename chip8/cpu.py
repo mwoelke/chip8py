@@ -123,7 +123,7 @@ class Chip8CPU:
             case (0x8, _, _, 0x6):  # 8xy6 (shift-right Vx)
                 self.instr_shr_vx()
             case (0x8, _, _, 0x7):  # 8xy7 (Vx = Vy - Vx)
-                self.instr_sub_vx_vy_vx()
+                self.instr_subn_vy()
             case (0x8, _, _, 0xE):  # 8xyE (shift-left Vx)
                 self.instr_shl_vx()
             case (0x9, _, _, 0x0):  # 9xy0 (skip if Vx != Vy)
@@ -319,19 +319,6 @@ class Chip8CPU:
         else:
             self.v[0xF] = 1
 
-    def instr_sub_vx_vy_vx(self):
-        """
-        8xy7: Vx = Vy - Vx, set Vf = 1 if Vy > Vx or Vf = 0 otherwise
-        """
-        x = (self.operand & 0x0F00) >> 8
-        y = (self.operand & 0x00F0) >> 4
-        self.v[x] = self.v[y] - self.v[x]
-        if self.v[x] < 0:
-            self.v[x] += 256 # todo test flag
-            self.v[0xF] = 1
-        else:
-            self.v[0xF] = 0
-
     def instr_shr_vx(self):
         """
         8xy6: Vx = Vy, then right-shift Vx by 1
@@ -340,14 +327,16 @@ class Chip8CPU:
         """
         x = (self.operand & 0x0F00) >> 8
         y = (self.operand & 0x00F0) >> 4
+
         self.v[x] = self.v[y]
-        self.v[0xF] = self.v[x] & 0x1
+        x_copy = self.v[x]
+
         self.v[x] >>= 1
+        self.v[0xF] = x_copy & 0x1
 
     def instr_subn_vy(self):
         """
-        8xy7: Subtract Vx from Vy and store in Vx.
-        Set Vf = 1 if Vx > Vy or Vf = 0 otherwise.
+        8xy7: Vx = Vy - Vx, set Vf = 1 if Vy > Vx of Vf = 0 otherwise
         """
         x = (self.operand & 0x0F00) >> 8
         y = (self.operand & 0x00F0) >> 4
@@ -367,10 +356,12 @@ class Chip8CPU:
         """
         x = (self.operand & 0x0F00) >> 8
         y = (self.operand & 0x00F0) >> 4
+        
         self.v[x] = self.v[y]
-        self.v[0xF] = (self.v[x] & 0x80) == 0x80
+        x_copy = self.v[x]
+        
         self.v[x] = (self.v[x] << 1) % 256
-        print(self.v[x])
+        self.v[0xF] = (x_copy & 0x80) == 0x80
 
     def instr_sne_vx_vy(self):
         """
