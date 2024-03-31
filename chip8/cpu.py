@@ -369,7 +369,8 @@ class Chip8CPU:
         y = (self.operand & 0x00F0) >> 4
         self.v[x] = self.v[y]
         self.v[0xF] = (self.v[x] & 0x80) == 0x80
-        self.v[x] <<= 1
+        self.v[x] = (self.v[x] << 1) % 256
+        print(self.v[x])
 
     def instr_sne_vx_vy(self):
         """
