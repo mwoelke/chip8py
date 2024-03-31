@@ -2,7 +2,6 @@ from chip8.cpu_exception import OpcodeNotImplementedException
 from chip8.display import Chip8Display
 from random import randint
 from math import floor
-from pygame import key
 import pygame
 
 MEMORY_SIZE = 4069

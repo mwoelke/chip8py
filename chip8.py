@@ -7,6 +7,7 @@ from argparse import ArgumentParser
 parser = ArgumentParser()
 parser.add_argument("-r", "--rom", required=True, help="ROM to load")
 parser.add_argument("-d", "--debug", help="Print debug information", action="store_true")
+parser.add_argument("-w", "--wait", default=0, help="Sleep n ms between instructions (default 0)")
 args = parser.parse_args()
 
 screen = Chip8Display()
@@ -29,6 +30,6 @@ with open(args.rom, "rb") as rom_file:
 
 # main loop
 while True:
-    pygame.time.wait(10)
+    pygame.time.wait(int(args.wait))
     cpu.handle_events(pygame.event.get())
     cpu.execute_instr()

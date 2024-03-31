@@ -8,7 +8,13 @@ Although this is a work in progress, it should handle some ROMs somewhat fine by
 # Usage
 
 ```
-./chip8.py -r ROM_PATH [-h/--help] [-d/--debug]
+chip8.py [-h] -r ROM [-d] [-w WAIT]
+
+options:
+  -h, --help            show this help message and exit
+  -r ROM, --rom ROM     ROM to load
+  -d, --debug           Print debug information
+  -w WAIT, --wait WAIT  Sleep n ms between instructions (default 0)
 ```
 
 # Setup
