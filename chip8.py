@@ -30,10 +30,5 @@ with open(args.rom, "rb") as rom_file:
 # main loop
 while True:
     pygame.time.wait(10)
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            exit()
-        elif event.type == TIMER_EVENT:
-            cpu.decrement_timers()
-    cpu.execute_instr(event)
+    cpu.handle_events(pygame.event.get())
+    cpu.execute_instr()

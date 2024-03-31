@@ -61,7 +61,10 @@ class Chip8CPU:
         # initialize RAM
         self.memory = bytearray(MEMORY_SIZE)
 
-    def execute_instr(self, event: list):
+        # set pressed keys
+        self.pressed_keys = []
+
+    def execute_instr(self):
         """
         Execute next instruction and handle keyboard events
         """
@@ -130,6 +133,8 @@ class Chip8CPU:
                 self.instr_sne_vx_vy()
             case (0xA, _, _, _):  # Axxx (I = xxx)
                 self.instr_ld_i_byte()
+            case (0xB, _, _, _):  # Bxxx (PC = xxx + v0)
+                self.instr_jmp_offset()
             case (0xC, _, _, _):  # Cxyy (Vx = random)
                 self.instr_vx_rnd()
             case (0xD, _, _, _):  # Dxyz (draw)
@@ -170,6 +175,19 @@ class Chip8CPU:
 
         for index, value in enumerate(memory):
             self.memory[index + offset] = value
+
+    def handle_events(self, events):
+        self.events = events
+        for event in events:
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            elif event.type == pygame.USEREVENT:
+                self.decrement_timers() 
+            elif event.type == pygame.KEYDOWN:
+                self.pressed_keys.append(event.key)
+            elif event.type == pygame.KEYUP:
+                self.pressed_keys.remove(event.key)
 
     def decrement_timers(self):
         """
@@ -380,7 +398,7 @@ class Chip8CPU:
 
     # Bxxx: Program counter is set to xxx + V0.
     # Note: Apparently this is not widely used and behaviour is different on SUPER-CHIP
-    def instr_jp_v0(self):
+    def instr_jmp_offset(self):
         self.pc = (self.operand & 0x0FFF) + self.v[0]
 
     def instr_vx_rnd(self):
@@ -437,12 +455,14 @@ class Chip8CPU:
 
         self.display.update()  # update screen
 
-    def instr_skp(self, event):
+    def instr_skp(self):
         """
         Ex9E: Skip next instruction if key with value of Vx is pressed
         """
         x = (self.operand & 0x0F00) >> 8
-        if key.get_pressed([KEY_MAPPINGS[self.v[x]]]):
+        if KEY_MAPPINGS[self.v[x]] in self.pressed_keys:
+            if self.debug:
+                print(f"Keypress handled: {KEY_MAPPINGS[self.v[x]]}")
             self.pc += 2
 
     def instr_sknp(self):
@@ -450,7 +470,8 @@ class Chip8CPU:
         ExA1: Skip next instruction if key with value of Vx is not pressed
         """
         x = (self.operand & 0x0F00) >> 8
-        if not key.get_pressed([KEY_MAPPINGS[self.v[x]]]):
+
+        if KEY_MAPPINGS[self.v[x]] not in self.pressed_keys:
             self.pc += 2
 
     def instr_ld_vx_dt(self):
@@ -465,31 +486,16 @@ class Chip8CPU:
         Fx0A: Stop execution until any key is pressed, then store value of key in Vx.
         If several keys are pressed this will respect the first key from the KEY_MAPPINGS constant.
         Note: Timers should continue to descent.
-        @todo
         """
         x = (self.operand & 0x0F00) >> 8
-
-        pressed = False
-        while not pressed:
-            for event in pygame.event.get():
-                if event.type == pygame.KEYDOWN:
-                    pressed_keys = key.get_pressed()
-                    # loop over every mapped key and set first pressed key
-                    # @todo how to get char values?
-                    for key_value, key_mapping in enumerate(KEY_MAPPINGS):
-                        if pressed_keys[key_mapping]:
-                            self.v[x] = key_value
-                            pressed = True
-                            break
-                        else:
-                            print(key_mapping)
-
-                elif event.type == TIMER_EVENT:
-                    self.decrement_timers()
-
-                elif event.type == pygame.QUIT:
-                    pygame.quit()
-                    exit()
+        print('Waiting for keypress...')
+        while True:
+            self.handle_events(pygame.event.get())
+            for key_value, key_mapping in KEY_MAPPINGS.items():
+                if key_mapping in self.pressed_keys:
+                    self.v[x] = key_value 
+                    print(f"Key {key_value} pressed")
+                    return
 
     def instr_ld_dt_vx(self):
         """
