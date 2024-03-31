@@ -121,6 +121,8 @@ class Chip8CPU:
                 self.instr_sub_vx_vy()
             case (0x8, _, _, 0x6):  # 8xy6 (shift-right Vx)
                 self.instr_shr_vx()
+            case (0x8, _, _, 0x7):  # 8xy7 (Vx = Vy - Vx)
+                self.instr_sub_vx_vy_vx()
             case (0x8, _, _, 0xE):  # 8xyE (shift-left Vx)
                 self.instr_shl_vx()
             case (0x9, _, _, 0x0):  # 9xy0 (skip if Vx != Vy)
@@ -310,6 +312,19 @@ class Chip8CPU:
             self.v[0xF] = 0
         else:
             self.v[0xF] = 1
+
+    def instr_sub_vx_vy_vx(self):
+        """
+        8xy7: Vx = Vy - Vx, set Vf = 1 if Vy > Vx or Vf = 0 otherwise
+        """
+        x = (self.operand & 0x0F00) >> 8
+        y = (self.operand & 0x00F0) >> 4
+        self.v[x] = self.v[y] - self.v[x]
+        if self.v[x] < 0:
+            self.v[x] += 256 # todo test flag
+            self.v[0xF] = 1
+        else:
+            self.v[0xF] = 0
 
     def instr_shr_vx(self):
         """
