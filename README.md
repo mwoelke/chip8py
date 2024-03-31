@@ -3,6 +3,13 @@ My take on a chip8 interpreter in python.
 
 This is a work in progress and doesn't run too many ROMs yet.
 
+# Setup
+
+`Pygame` is the sole dependency. If not installed, run `pip install -r requirements.txt`.
+
+Developed/tested against Python 3.11, however lower versions might work as well.
+
+
 # References
 Big shoutouts to the following articles / posts / repos:
 
