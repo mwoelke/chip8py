@@ -23,6 +23,11 @@ options:
 
 Developed/tested against Python 3.11, however lower versions might work as well.
 
+# Benchmark
+
+Run `./run_benchmark.sh` to run a benchmark. Automatically downloads required ROMs. 
+
+This exists mostly for me to iterate over different ideas to make things more efficient.
 
 # References
 Big shoutouts to the following articles / posts / repos:
