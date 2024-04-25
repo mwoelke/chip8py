@@ -63,6 +63,9 @@ class Chip8CPU:
         # set pressed keys
         self.pressed_keys = []
 
+        # cache for decoded instructions
+        self.op_cache = {}
+
     def execute_instr(self):
         """
         Execute next instruction and handle keyboard events
@@ -73,6 +76,21 @@ class Chip8CPU:
         # get second byte of next instruction from memory
         self.operand += self.memory[self.pc + 1]
 
+        # increment program counter by two bytes
+        self.pc += 2
+
+        if self.debug:
+            print("-----")
+            print(
+                f"Executing: {hex(self.operand)}"
+            )
+            print(f"PC: {self.pc}")
+
+        # execute opcode from cache and return if cached 
+        if self.operand in self.op_cache:
+            self.op_cache[self.operand]()
+            return
+
         # split operand into nibbles
         operand_nibbles = (
             (self.operand & 0xF000) >> 12,
@@ -80,91 +98,84 @@ class Chip8CPU:
             (self.operand & 0x00F0) >> 4,
             (self.operand & 0x000F),
         )
-
-        if self.debug:
-            print("-----")
-            print(
-                f"Executing: {hex(operand_nibbles[0]), hex(operand_nibbles[1]), hex(operand_nibbles[2]), hex(operand_nibbles[3])}"
-            )
-            print(f"PC: {self.pc}")
-
-        # decode and execute
+        
+        # decode, execute and add to cache
+        instr = None
         match operand_nibbles:
             case (0x0, 0x0, 0xE, 0x0):  # 00E0 (clear screen)
-                self.instr_cls()
+                instr = self.instr_cls
             case (0x0, 0x0, 0xE, 0xE):  # 00EE (return from subroutine)
-                self.instr_ret()
+                instr = self.instr_ret
             case (0x1, _, _, _):  # 1xxx (jump)
-                self.instr_jmp()
-                return  # Do not increment pc
+                instr = self.instr_jmp
             case (0x2, _, _, _):  # 2xxx (call subroutine)
-                self.instr_call()
-                return  # Do not increment pc
+                instr = self.instr_call
             case (0x3, _, _, _):  # 3xyy (skip if Vx == yy)
-                self.instr_se_vx_byte()
+                instr = self.instr_se_vx_byte
             case (0x4, _, _, _):  # 4xyy (skip if Vx != yy)
-                self.instr_sne_vx_byte()
+                instr = self.instr_sne_vx_byte
             case (0x5, _, _, 0):  # 5xy0 (skip if Vx == Vy)
-                self.instr_se_vx_vy()
+                instr = self.instr_se_vx_vy
             case (0x6, _, _, _):  # 6xyy (Vx == yy)
-                self.instr_ld_byte()
+                instr = self.instr_ld_byte
             case (0x7, _, _, _):  # 7xyy (Vx += yy)
-                self.instr_add_byte()
+                instr = self.instr_add_byte
             case (0x8, _, _, 0x0):  # 8xy0 (Vx = Vy)
-                self.instr_ld_vx_vy()
+                instr = self.instr_ld_vx_vy
             case (0x8, _, _, 0x1):  # 8xy1 (Vx OR Vy)
-                self.instr_or_vx_vy()
+                instr = self.instr_or_vx_vy
             case (0x8, _, _, 0x2):  # 8xy2 (Vx AND Vy)
-                self.instr_and_vx_vy()
+                instr = self.instr_and_vx_vy
             case (0x8, _, _, 0x3):  # 8xy3 (Vx XOR Vy)
-                self.instr_xor_vx_vy()
+                instr = self.instr_xor_vx_vy
             case (0x8, _, _, 0x4):  # 8xy4 (Vx += Vy)
-                self.instr_add_vx_vy()
+                instr = self.instr_add_vx_vy
             case (0x8, _, _, 0x5):  # 8xy5 (Vx -= Vy)
-                self.instr_sub_vx_vy()
+                instr = self.instr_sub_vx_vy
             case (0x8, _, _, 0x6):  # 8xy6 (shift-right Vx)
-                self.instr_shr_vx()
+                instr = self.instr_shr_vx
             case (0x8, _, _, 0x7):  # 8xy7 (Vx = Vy - Vx)
-                self.instr_subn_vy()
+                instr = self.instr_subn_vy
             case (0x8, _, _, 0xE):  # 8xyE (shift-left Vx)
-                self.instr_shl_vx()
+                instr = self.instr_shl_vx
             case (0x9, _, _, 0x0):  # 9xy0 (skip if Vx != Vy)
-                self.instr_sne_vx_vy()
+                instr = self.instr_sne_vx_vy
             case (0xA, _, _, _):  # Annn (I = nnn)
-                self.instr_ld_i_byte()
+                instr = self.instr_ld_i_byte
             case (0xB, _, _, _):  # Bnnn (PC = xxx + v0)
-                self.instr_jmp_offset()
-                return
+                instr = self.instr_jmp_offset
             case (0xC, _, _, _):  # Cxnn (Vx = random)
-                self.instr_vx_rnd()
+                instr = self.instr_vx_rnd
             case (0xD, _, _, _):  # Dxyz (draw)
-                self.instr_drw()
+                instr = self.instr_drw
             case (0xE, _, 0x9, 0xE):  # Ex9E (skip if key with value Vx is pressed)
-                self.instr_skp()
+                instr = self.instr_skp
             case (0xE, _, 0xA, 0x1):  # ExA1 (skip if key with value vx is not pressed)
-                self.instr_sknp()
+                instr = self.instr_sknp
             case (0xF, _, 0x0, 0x7):  # Fx07 (Vx = delay timer)
-                self.instr_ld_vx_dt()
+                instr = self.instr_ld_vx_dt
             case (0xF, _, 0x0, 0xA):  # Fx0A (Wait for keypress, then store in Vx)
-                self.instr_ld_vx_k()
+                instr = self.instr_ld_vx_k
             case (0xF, _, 0x1, 0x5):  # Fx15 (delay timer = Vx)
-                self.instr_ld_dt_vx()
+                instr = self.instr_ld_dt_vx
             case (0xF, _, 0x1, 0x8):  # Fx19 (sound timer = Vx, not implemented)
                 pass
             case (0xF, _, 0x1, 0xE):  # Fx1E (I += Vx)
-                self.instr_add_i_vx()
+                instr = self.instr_add_i_vx
             case (0xF, _, 0x2, 0x9):  # Fx29 (Load sprite for nibble at Vx)
-                self.instr_ld_i_vx()
+                instr = self.instr_ld_i_vx
             case (0xF, _, 0x3, 0x3):  # Fx33 (Store decimal number at I)
-                self.instr_ld_bcd_vx_i()
+                instr = self.instr_ld_bcd_vx_i
             case (0xF, _, 0x5, 0x5):  # Fx55 (Store V0 to Vx starting at I)
-                self.instr_store_v0_vx()
+                instr = self.instr_store_v0_vx
             case (0xF, _, 0x6, 0x5):  # Fx65 (Read V0 to Vx starting at I)
-                self.instr_read_v0_vx()
+                instr = self.instr_read_v0_vx
             case _:  # unknown opcode, raise exception
                 raise OpcodeNotImplementedException((operand_nibbles, self.pc - 0x200))
+            
+        instr()
+        self.op_cache[self.operand] = instr
 
-        self.pc += 2  # increment program counter by two bytes
 
     def load_memory(self, memory: bytearray, offset: int):
         """
