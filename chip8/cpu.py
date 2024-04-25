@@ -130,11 +130,12 @@ class Chip8CPU:
                 self.instr_shl_vx()
             case (0x9, _, _, 0x0):  # 9xy0 (skip if Vx != Vy)
                 self.instr_sne_vx_vy()
-            case (0xA, _, _, _):  # Axxx (I = xxx)
+            case (0xA, _, _, _):  # Annn (I = nnn)
                 self.instr_ld_i_byte()
-            case (0xB, _, _, _):  # Bxxx (PC = xxx + v0)
+            case (0xB, _, _, _):  # Bnnn (PC = xxx + v0)
                 self.instr_jmp_offset()
-            case (0xC, _, _, _):  # Cxyy (Vx = random)
+                return
+            case (0xC, _, _, _):  # Cxnn (Vx = random)
                 self.instr_vx_rnd()
             case (0xD, _, _, _):  # Dxyz (draw)
                 self.instr_drw()
@@ -289,26 +290,32 @@ class Chip8CPU:
     def instr_or_vx_vy(self):
         """
         8xy1: Vx OR Vy, store result in Vx
+        Quirk: Set VF to 0
         """
         x = (self.operand & 0x0F00) >> 8
         y = (self.operand & 0x00F0) >> 4
         self.v[x] |= self.v[y]
+        self.v[0xF] = 0
 
     def instr_and_vx_vy(self):
         """
         8xy2: Vx AND Vy, store result in Vx
+        Quirk: Set VF to 0
         """
         x = (self.operand & 0x0F00) >> 8
         y = (self.operand & 0x00F0) >> 4
         self.v[x] &= self.v[y]
+        self.v[0xF] = 0
 
     def instr_xor_vx_vy(self):
         """
         8xy3: Vx XOR Vy, store result in Vx
+        Quirk: Set VF to 0
         """
         x = (self.operand & 0x0F00) >> 8
         y = (self.operand & 0x00F0) >> 4
         self.v[x] = self.v[x] ^ self.v[y]
+        self.v[0xF] = 0
 
     def instr_add_vx_vy(self):
         """
@@ -393,18 +400,19 @@ class Chip8CPU:
 
     def instr_ld_i_byte(self):
         """
-        I = xxx
+        Annn: I = nnn
         """
         self.I = self.operand & 0x0FFF
 
-    # Bxxx: Program counter is set to xxx + V0.
-    # Note: Apparently this is not widely used and behaviour is different on SUPER-CHIP
     def instr_jmp_offset(self):
+        """
+        Bnnn: Set program counter to nnn + v0
+        """
         self.pc = (self.operand & 0x0FFF) + self.v[0]
 
     def instr_vx_rnd(self):
         """
-        Cxyy: Set Vx to a random byte AND yy
+        Cxnn: Set Vx to a random byte AND nn
         """
         x = (self.operand & 0x0F00) >> 8
         rand = randint(0, 255)
@@ -542,17 +550,22 @@ class Chip8CPU:
     def instr_store_v0_vx(self):
         """
         Fx55: Store v0 to Vx in memory starting at address in I
+        Quirk: I gets incremented on every store 
         """
         x = (self.operand & 0x0F00) >> 8
 
         for i in range(x + 1):
-            self.memory[self.I + i] = self.v[i]
+            self.memory[self.I] = self.v[i]
+            self.I += 1
 
     def instr_read_v0_vx(self):
         """
         Fx65: Read v0 to Vx from memory starting at address in I
+        Quirk: I gets incremented on every read
         """
         x = (self.operand & 0x0F00) >> 8
 
         for i in range(x + 1):
-            self.v[i] = self.memory[self.I + i]
+            self.v[i] = self.memory[self.I]
+            self.I += 1
+
