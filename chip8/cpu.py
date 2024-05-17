@@ -509,13 +509,19 @@ class Chip8CPU:
         """
         x = (self.operand & 0x0F00) >> 8
         print('Waiting for keypress...')
+        pressed = None
         while True:
             self.handle_events(pygame.event.get())
-            for key_value, key_mapping in KEY_MAPPINGS.items():
-                if key_mapping in self.pressed_keys:
-                    self.v[x] = key_value 
-                    print(f"Key {key_value} pressed")
-                    return
+            if pressed == None:
+                for key_value, key_mapping in KEY_MAPPINGS.items():
+                    if key_mapping in self.pressed_keys:
+                        self.v[x] = key_value 
+                        print(f"Key {key_mapping} pressed")
+                        pressed = key_mapping
+            else:
+                if pressed not in self.pressed_keys:
+                    print(f"Key {pressed} released")
+                    return 
 
     def instr_ld_dt_vx(self):
         """
