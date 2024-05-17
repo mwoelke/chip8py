@@ -1,8 +1,10 @@
 import pygame
+import sys
 
 COLOR_OFF = (0xff, 0xf6, 0xd3)
 COLOR_ON  = (0x7c, 0x3f, 0x58)
 SCALE = 10
+
 
 class Chip8Display(object):
     def __init__(self):
@@ -11,8 +13,6 @@ class Chip8Display(object):
         self.height = 32
 
         pygame.init()
-
-        self.screen_state = [ [0]*self.height for _ in range(self.width)]
 
         self.screen = pygame.display.set_mode((self.width * SCALE, self.height * SCALE))
         self.screen.fill(COLOR_ON)
@@ -26,21 +26,18 @@ class Chip8Display(object):
         :returns:
             0 if pixel was not set before, 1 if pixel was set
         """
-        curr_pixel = self.screen_state[x][y]
+        curr_pixel = self.screen.get_at((x * SCALE, y * SCALE))
 
-        if curr_pixel == 0:
+        if curr_pixel == COLOR_OFF:
             new_color = COLOR_ON
-            self.screen_state[x][y] = 1
             res = False
         else:
             new_color = COLOR_OFF
-            self.screen_state[x][y] = 0
             res = True
         pygame.draw.rect(self.screen, new_color, (x * SCALE, y * SCALE, SCALE, SCALE))
         return res
 
     def clear(self):
-        self.screen_state = [ [0]*self.height for _ in range(self.width)]
         self.screen.fill(COLOR_OFF)
 
     def update(self):
