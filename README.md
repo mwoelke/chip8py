@@ -1,7 +1,8 @@
 # chip8py
+
 My take on a chip8 interpreter in python.
 
-Although this is a work in progress, it should handle some ROMs somewhat fine by now.
+This should handle most ROMs fine. If games run too fast, run them with a delay (see below).
 
 **Note**: Chip8 is a bit of a weird plattform given it's different implementations with their own quirks. This specific implementation only handles the original chip8.
 
@@ -22,6 +23,11 @@ options:
 `Pygame` is the sole dependency. If not installed, run `pip install -r requirements.txt`.
 
 Developed/tested against Python 3.11, however lower versions might work as well.
+
+## Note on sound
+
+The chip8 only knows one beep sound. I find it rather annoying and doesn't add much value, which is why I didn't include one.
+You may add your favorite beep sound as 'sound.wav' to the root directory and it will be used.
 
 # Benchmark
 

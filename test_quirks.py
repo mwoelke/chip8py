@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 from chip8.cpu import Chip8CPU
 from chip8.display import Chip8Display
 from timeit import default_timer as timer
@@ -23,11 +24,6 @@ with open('roms/5-quirks.ch8', "rb") as rom_file:
     rom = bytearray(rom_file.read())
     cpu.load_memory(rom, 0x200)
 
-# run for exactly 75,502 instructions
-start = timer()
-for i in range(75_502):
-    #pygame.time.wait(int(args.wait))
+while True:
     cpu.handle_events(pygame.event.get())
     cpu.execute_instr()
-end = timer()
-print(f"Quirks test took {end - start}s")

@@ -1,3 +1,4 @@
 chip8/__pycache__
 roms/
 .venv/
+*.wav

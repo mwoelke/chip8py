@@ -35,7 +35,7 @@ class Chip8CPU:
         # initialize the 16 general purpose registers (v0 - vF) (8 bit)
         self.v = []
         # fill v registers with 0 on boot
-        for currRegister in range(0xF + 1):
+        for _ in range(0xF + 1):
             self.v.append(0x0)
 
         # initialize I register (16 bit)
@@ -43,10 +43,6 @@ class Chip8CPU:
 
         # initialize program counter (16 bit)
         self.pc = 0x200
-
-        # initialize stack pointer (8 bit)
-        # self.sp = 0x0
-        # is this needed?
 
         # initialize stack (should be 16 x 16 bit)
         self.stack = []
@@ -65,6 +61,21 @@ class Chip8CPU:
 
         # cache for decoded instructions
         self.op_cache = {}
+
+        # create sound mixer
+        self.mixer = pygame.mixer.init()
+
+        # load sound.wav if exists
+        try:
+            wav_file = open('sound.wav')
+            self.sound = pygame.mixer.Sound(bytes.fromhex(wav_file.read()))
+            self.audio_playing = False
+        except OSError:
+            # missing file is fine, there will not be any sound
+            self.audio_playing = None
+
+        # clear screen once on startup (fixes bug with breakout game)
+        self.display.clear()
 
     def execute_instr(self):
         """
@@ -146,7 +157,7 @@ class Chip8CPU:
                 instr = self.instr_jmp_offset
             case (0xC, _, _, _):  # Cxnn (Vx = random)
                 instr = self.instr_vx_rnd
-            case (0xD, _, _, _):  # Dxyz (draw)
+            case (0xD, _, _, _):  # Dxyn (draw sprite)
                 instr = self.instr_drw
             case (0xE, _, 0x9, 0xE):  # Ex9E (skip if key with value Vx is pressed)
                 instr = self.instr_skp
@@ -158,8 +169,8 @@ class Chip8CPU:
                 instr = self.instr_ld_vx_k
             case (0xF, _, 0x1, 0x5):  # Fx15 (delay timer = Vx)
                 instr = self.instr_ld_dt_vx
-            case (0xF, _, 0x1, 0x8):  # Fx19 (sound timer = Vx, not implemented)
-                return
+            case (0xF, _, 0x1, 0x8):  # Fx18 (sound timer = Vx, not implemented)
+                instr = self.instr_ld_st_vx
             case (0xF, _, 0x1, 0xE):  # Fx1E (I += Vx)
                 instr = self.instr_add_i_vx
             case (0xF, _, 0x2, 0x9):  # Fx29 (Load sprite for nibble at Vx)
@@ -204,13 +215,22 @@ class Chip8CPU:
 
     def decrement_timers(self):
         """
-        Decrease delay and sound timer by one
+        Decrease delay and sound timer by one and play sound
         """
-        # print(f"Delay: {self.timers['delay']} | Sound: {self.timers['sound']}")
         if self.timers["delay"] > 0:
             self.timers["delay"] -= 1
         if self.timers["sound"] > 0:
             self.timers["sound"] -= 1
+            if self.timers["sound"] == 0 and self.audio_playing != None:
+                self.audio_playing = False
+            if self.audio_playing == None:
+                # do nothing if sound.wav does not exist
+                return
+            elif self.audio_playing == False:
+                self.audio_playing = True
+                self.sound.play()
+                
+                
 
     ###################
     ### CPU opcodes ###
@@ -431,12 +451,12 @@ class Chip8CPU:
 
     def instr_drw(self):
         """
-        Dxyz: Display z-byte sprite starting from I at (Vx, Vy).
-        Set Vf = 1 if a already drawn pixel gets overwritten (XOR).
+        Dxyn: Display n-byte sprite starting from I at (Vx, Vy).
+        Set Vf = 1 if an already drawn pixel gets overwritten (XOR).
         """
         x = (self.operand & 0x0F00) >> 8
         y = (self.operand & 0x00F0) >> 4
-        z = self.operand & 0x000F
+        n = self.operand & 0x000F
 
         x_pos = self.v[x] % 64
         y_pos = self.v[y] % 32
@@ -445,7 +465,8 @@ class Chip8CPU:
             print(f"Printing sprite at ({(x_pos, y_pos)})")
 
         self.v[0xF] = 0  # reset Vf
-        for row in range(z):
+
+        for row in range(n):
             # get byte to display at current row
             sprite_row = self.memory[self.I + row]
 
@@ -473,7 +494,8 @@ class Chip8CPU:
                     if self.display.flip_pixel(x_coord, y_coord):
                         self.v[0xF] = 1
 
-        self.display.update()  # update screen
+        # update screen
+        self.display.update()  
 
     def instr_skp(self):
         """
@@ -530,10 +552,12 @@ class Chip8CPU:
         x = (self.operand & 0x0F00) >> 8
         self.timers["delay"] = self.v[x]
 
-    # Fx18: Sound timer = Vx
-    def instr_ld_vx_st(self):
+    def instr_ld_st_vx(self):
+        """
+        Fx18: Sound timer = Vx
+        """
         x = (self.operand & 0x0F00) >> 8
-        self.timers["delay"] = self.v[x]
+        self.timers["sound"] = self.v[x]
 
     def instr_add_i_vx(self):
         """
